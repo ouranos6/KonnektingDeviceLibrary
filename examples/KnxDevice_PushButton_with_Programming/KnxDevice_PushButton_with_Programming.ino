@@ -32,7 +32,6 @@ SoftwareSerial debugSerial(10, 11); // RX, TX
 
 // Definition of the Communication Objects attached to the device
 KnxComObject _comObjectsList[] = {
-    ///* needs to be there, as long as Tools is used */ Tools.createProgComObject(),
     /* Index 0 : */ KnxComObject(G_ADDR(0, 0, 1), KNX_DPT_1_001, COM_OBJ_LOGIC_IN),
     /* Index 1 : */ KnxComObject(G_ADDR(0, 0, 2), KNX_DPT_1_001, COM_OBJ_SENSOR),
 };
