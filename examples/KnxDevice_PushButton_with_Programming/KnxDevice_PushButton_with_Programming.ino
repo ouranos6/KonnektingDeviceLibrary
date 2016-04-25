@@ -1,3 +1,9 @@
+// include KonnektingDevice library
+#include <KonnektingDevice.h>
+
+// #############################################################################
+// ### DEBUG SETTINGS
+
 // comment following line to disable DEBUG mode
 #define DEBUG debugSerial
 
@@ -7,28 +13,23 @@
 SoftwareSerial debugSerial(10, 11); // RX, TX
 #endif
 
-// include KonnektingDevice library
-#include <KonnektingDevice.h>
+// #############################################################################
+// ### KONNEKTING DEVICE SETTINGS
 
+#define MANUFACTURER_ID 57005
+#define DEVICE_ID 190
+#define REVISION 175
 
-// define programming-led PIN
-#ifdef ESP8266
-#define PROG_LED_PIN BUILTIN_LED // ESP8266 uses wrong constant. See PR: https://github.com/esp8266/Arduino/pull/1556
-#else
-#define PROG_LED_PIN LED_BUILTIN  // defaults to on-board LED for AVR Arduinos
-#endif
-
-// define programming-button PIN
+// define programming  button + LED
 #define PROG_BUTTON_PIN 3
+#define PROG_LED_PIN LED_BUILTIN
 
 // define KNX Transceiver serial port
 #ifdef __AVR_ATmega328P__
-#define KNX_SERIAL Serial // Nano/ProMini etc. use Serial
+    #define KNX_SERIAL Serial // Nano/ProMini etc. use Serial
 #else
-#define KNX_SERIAL Serial1 // Leonardo/Micro etc. use Serial1
+    #define KNX_SERIAL Serial1 // Leonardo/Micro etc. use Serial1
 #endif
-
-// #############################################################################
 
 // create com objects
 KnxComObject _comObjectsList[] = {
@@ -52,6 +53,9 @@ byte _paramSizeList[] = {
 
 // Create KONNEKTING Instance
 KonnektingDevice konnekting;
+
+// #############################################################################
+// ### SKETCH
 
 bool state = false;
 
@@ -84,13 +88,13 @@ void setup() {
     
     // Initialize KNX enabled Arduino Board
     konnekting.init(/* KNX transceiver serial port */ KNX_SERIAL, 
-            _comObjectsList, 
-            _paramSizeList,
+            /* CONOBJ list */ _comObjectsList, 
+            /* Parameter size list*/ _paramSizeList,
             /* Prog Button Pin */ PROG_BUTTON_PIN, 
             /* Prog LED Pin */ PROG_LED_PIN, 
-            /* manufacturer */ 57005, 
-            /* device */ 190, 
-            /* revision */ 175);
+            /* manufacturer */ MANUFACTURER_ID, 
+            /* device */ DEVICE_ID, 
+            /* revision */ REVISION);
     
 #ifdef DEBUG
     DEBUG.print("param #0: ");
