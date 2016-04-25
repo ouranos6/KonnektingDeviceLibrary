@@ -40,7 +40,7 @@ const char KnxTpUart::_debugErrorText[] = "KNXTPUART ERROR: ";
 
 
 // Constructor
-KnxTpUart::KnxTpUart(HardwareSerial& serial, KnxDevice* knxDevice, word physicalAddr, type_KnxTpUartMode mode)
+KnxTpUart::KnxTpUart(HardwareSerial& serial, KonnektingDevice* knxDevice, word physicalAddr, type_KnxTpUartMode mode)
 : _serial(serial), _physicalAddr(physicalAddr), _mode(mode)
 {
   _knxDevice = knxDevice;

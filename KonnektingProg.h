@@ -24,11 +24,12 @@
  * @license GPLv3
  */
 
-#ifndef KNXTOOLS_h
-#define KNXTOOLS_h
+#ifndef KONNEKTINGPROG_h
+#define KONNEKTINGPROG_h
 
 #include <Arduino.h> 
-#include <KnxDevice.h>
+class KonnektingDevice;
+#include <KonnektingDevice.h>
 #include <EEPROM.h>
 
 #ifndef ESP8266 
@@ -39,6 +40,35 @@
 #define LED_BUILTIN 16
 #endif
 
+#define EEPROM_DEVICE_FLAGS          0
+#define EEPROM_INDIVIDUALADDRESS_HI  1
+#define EEPROM_INDIVIDUALADDRESS_LO  2
+#define EEPROM_COMOBJECTTABLE_START 10
+
+#define PROTOCOLVERSION 0
+
+#define MSGTYPE_ACK                         0 // 0x00
+#define MSGTYPE_READ_DEVICE_INFO            1 // 0x01
+#define MSGTYPE_ANSWER_DEVICE_INFO          2 // 0x02
+#define MSGTYPE_RESTART                     9 // 0x09
+
+#define MSGTYPE_WRITE_PROGRAMMING_MODE      10 // 0x0A
+#define MSGTYPE_READ_PROGRAMMING_MODE       11 // 0x0B
+#define MSGTYPE_ANSWER_PROGRAMMING_MODE     12 // 0x0C
+
+#define MSGTYPE_WRITE_INDIVIDUAL_ADDRESS    20 // 0x14
+#define MSGTYPE_READ_INDIVIDUAL_ADDRESS     21 // 0x15
+#define MSGTYPE_ANSWER_INDIVIDUAL_ADDRESS   22 // 0x16
+
+#define MSGTYPE_WRITE_PARAMETER             30 // 0x1E
+#define MSGTYPE_READ_PARAMETER              31 // 0x1F
+#define MSGTYPE_ANSWER_PARAMETER            32 // 0x20
+
+#define MSGTYPE_WRITE_COM_OBJECT            40 // 0x28
+#define MSGTYPE_READ_COM_OBJECT             41 // 0x29
+#define MSGTYPE_ANSWER_COM_OBJECT           42 // 0x2A
+
+
 #define PARAM_INT8 1
 #define PARAM_UINT8 1
 #define PARAM_INT16 2
@@ -48,49 +78,40 @@
 
 
 // process intercepted knxEvents-calls with this method
-extern void knxToolsEvents(byte index);
+extern void konnektingProgEvents(byte index);
 
-class KnxTools {
-    
-    // Reference to KnxDevice
-    KnxDevice* _knxDevice;  
-    
-    byte _paramSizeList[];
-    byte _numberOfParams;                // Nb of attached Parameters
-
-    // Constructor, Destructor
-    
-
+class KonnektingProg {
 public:
-    
-    KnxTools(KnxDevice* knxDevice); // private constructor (singleton design pattern)
-    ~KnxTools();
 
-    void init(HardwareSerial& serial, int progButtonPin, int progLedPin, word manufacturerID, byte deviceID, byte revisionID);
+    KonnektingProg(KonnektingDevice* device);
+    ~KonnektingProg();
+
+    void init(int progButtonPin, int progLedPin, word manufacturerID, byte deviceID, byte revisionID);
 
     /**
-     * needs to be called in "void knxToolsEvents(byte index)" to check if ComObject is
+     * needs to be called in "void KonnektingProgEvents(byte index)" to check if ComObject is
      * an internal ComObject which is not needed to be handled by developer
      * f.i. ComObject 0 --> for programming purpose
      * @param index index of KnxComObject
      * @return if provided comobject index is an internal comobject (true) or not (false)
      */
     bool internalComObject(byte index);
+    
+    word getIndividualAddress();
 
-    // must be public to be accessible from KnxToolsProgButtonPressed())
+    // must be public to be accessible from KonnektingProgProgButtonPressed())
     void toggleProgState();
 
-    KnxComObject createProgComObject();
 
     byte getParamSize(byte index);
     void getParamValue(int index, byte* value);
-    
+
     uint8_t getUINT8Param(byte index);
     int8_t getINT8Param(byte index);
-    
+
     uint16_t getUINT16Param(byte index);
     int16_t getINT16Param(byte index);
-    
+
     uint32_t getUINT32Param(byte index);
     int32_t getINT32Param(byte index);
 
@@ -102,6 +123,12 @@ public:
     //
     //
 private:
+
+    // Reference to KnxDevice
+    KonnektingDevice* _device;
+
+    byte _paramSizeList[];
+    byte _numberOfParams; // Nb of attached Parameters
 
     bool _initialized = false;
 
@@ -139,15 +166,12 @@ private:
     void handleMsgReadParameter(byte* msg);
     void handleMsgWriteComObject(byte* msg);
     void handleMsgReadComObject(byte* msg);
-    
+
     void memoryUpdate(int index, byte date);
 
 };
 
-// not part of KnxTools class
-void KnxToolsProgButtonPressed();
+// not part of KonnektingProg class
+void KonnektingProgProgButtonPressed();
 
-// Reference to the KnxDevice unique instance
-extern KnxTools& Tools;
-
-#endif // KNXTOOLS_h
+#endif // KONNEKTINGPROG_h

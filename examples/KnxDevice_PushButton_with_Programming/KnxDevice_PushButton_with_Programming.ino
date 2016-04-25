@@ -7,8 +7,8 @@
 SoftwareSerial debugSerial(10, 11); // RX, TX
 #endif
 
-// include KnxDevice library
-#include <KnxDevice.h>
+// include KonnektingDevice library
+#include <KonnektingDevice.h>
 
 
 // define programming-led PIN
@@ -50,11 +50,8 @@ byte _paramSizeList[] = {
     /* Param Index 9 */ PARAM_UINT8,
 };
 
-// Create KNX Instance
-KnxDevice knx(_comObjectsList, _paramSizeList);
-
-// Create Tools Instance
-//KnxTools tools(&knx);
+// Create KONNEKTING Instance
+KonnektingDevice konnekting;
 
 bool state = false;
 
@@ -66,10 +63,10 @@ void knxEvents(byte index) {
 
     if (state) {
         digitalWrite(PROG_LED_PIN, HIGH);
-//        knx.write(2, true );
+        konnekting.write(2, true );
     } else {
         digitalWrite(PROG_LED_PIN, LOW);
-//        knx.write(2, false );
+        konnekting.write(2, false );
     }
     
 };
@@ -80,33 +77,33 @@ void setup() {
 #ifdef DEBUG
     DEBUG.begin(9600);
 #endif
-    
-//    knx.setComObjectList(_comObjectsList);
-//    knx.setParamSizeList(_paramSizeList);
-    
+       
     // set well defined state for LED pin for this special sample. Can be skipped in other sketches.
     pinMode(PROG_LED_PIN, OUTPUT);
     digitalWrite(PROG_LED_PIN, LOW);
     
     // Initialize KNX enabled Arduino Board
-//    tools.init(/* KNX transceiver serial port */ KNX_SERIAL, 
-//            /* Prog Button Pin */ PROG_BUTTON_PIN, 
-//            /* Prog LED Pin */ PROG_LED_PIN, 
-//            /* manufacturer */ 57005, 
-//            /* device */ 190, 
-//            /* revision */175);
+    konnekting.init(/* KNX transceiver serial port */ KNX_SERIAL, 
+            _comObjectsList, 
+            _paramSizeList,
+            /* Prog Button Pin */ PROG_BUTTON_PIN, 
+            /* Prog LED Pin */ PROG_LED_PIN, 
+            /* manufacturer */ 57005, 
+            /* device */ 190, 
+            /* revision */175);
     
 #ifdef DEBUG
     DEBUG.print("param #0: ");
-//    DEBUG.print(Tools.getUINT8Param(0));
+    DEBUG.print(konnekting.getProg()->getUINT8Param(0));
+    konnekting.getProg()->getUINT8Param(0);
     DEBUG.println("");
     
     DEBUG.print("param #1: ");
-//    DEBUG.print(Tools.getINT16Param(1));
+    DEBUG.print(konnekting.getProg()->getINT16Param(1));
     DEBUG.println("");
     
     DEBUG.print("param #2: ");
-//    DEBUG.print(Tools.getUINT32Param(2));
+    DEBUG.print(konnekting.getProg()->getUINT32Param(2));
     DEBUG.println("");
 #endif    
 
@@ -114,5 +111,5 @@ void setup() {
 }
 
 void loop() {
-    knx.task();
+    konnekting.task();
 }

@@ -37,8 +37,8 @@
 
 #include "Arduino.h"
 #include "HardwareSerial.h"
-class KnxDevice;
-#include "KnxDevice.h"
+class KonnektingDevice;
+#include "KonnektingDevice.h"
 #include "KnxTelegram.h"
 #include "KnxComObject.h"
 
@@ -147,8 +147,8 @@ typedef struct {
 
 class KnxTpUart {
     
-    // Reference to KnxDevice
-    KnxDevice* _knxDevice;                  
+    // Reference to KonnektingDevice
+    KonnektingDevice* _knxDevice;                  
     
     // Arduino HW serial port connected to the TPUART
     HardwareSerial& _serial;                  
@@ -194,7 +194,7 @@ static const char _debugErrorText[];
   public:  
   
   // Constructor / Destructor
-    KnxTpUart(HardwareSerial& serial, KnxDevice* knxDevice, word physicalAddr, type_KnxTpUartMode _mode);
+    KnxTpUart(HardwareSerial& serial, KonnektingDevice* knxDevice, word physicalAddr, type_KnxTpUartMode _mode);
     ~KnxTpUart();
 
   // INLINED functions (see definitions later in this file)
