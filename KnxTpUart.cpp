@@ -40,18 +40,19 @@ const char KnxTpUart::_debugErrorText[] = "KNXTPUART ERROR: ";
 
 
 // Constructor
-KnxTpUart::KnxTpUart(HardwareSerial& serial, word physicalAddr, type_KnxTpUartMode mode)
+KnxTpUart::KnxTpUart(HardwareSerial& serial, KnxDevice* knxDevice, word physicalAddr, type_KnxTpUartMode mode)
 : _serial(serial), _physicalAddr(physicalAddr), _mode(mode)
 {
+  _knxDevice = knxDevice;
   _rx.state = RX_RESET;
   _rx.addressedComObjectIndex = 0;
   _tx.state = TX_RESET;
   _tx.sentTelegram = NULL;
-  _tx.ackFctPtr = NULL;
+//  _tx.ackFctPtr = NULL;
   _tx.nbRemainingBytes = 0;
   _tx.txByteIndex = 0;
   _stateIndication = 0;
-  _evtCallbackFct = NULL;
+//  _evtCallbackFct = NULL;
   _comObjectsList = NULL;
   _assignedComObjectsNb = 0;
   _orderedIndexTable = NULL;
@@ -121,11 +122,12 @@ byte attempts = 10;
 // NB2 : In case of objects with identical address, the object with highest index only is considered
 // return KNX_TPUART_ERROR_NOT_INIT_STATE (254) if the TPUART is not in Init state
 // The function must be called prior to Init() execution
-byte KnxTpUart::AttachComObjectsList(KnxComObject comObjectsList[], byte listSize)
+byte KnxTpUart::AttachComObjectsList(KnxComObject comObjectsList[])
 {
 #define IS_COM(index) (comObjectsList[index].GetIndicator() & KNX_COM_OBJ_C_INDICATOR)
 #define ADDR(index) (comObjectsList[index].GetAddr())
 
+    byte listSize = sizeof (comObjectsList) / sizeof (KnxComObject);
   if ((_rx.state!=RX_INIT) || (_tx.state!=TX_INIT)) return KNX_TPUART_ERROR_NOT_INIT_STATE;
 
   if (_orderedIndexTable)
@@ -205,8 +207,8 @@ byte KnxTpUart::Init(void)
   else // NORMAL mode by default
   {
     if (_comObjectsList == NULL)  DebugInfo("Init : warning : empty object list!\n");
-    if (_evtCallbackFct == NULL) return KNX_TPUART_ERROR_NULL_EVT_CALLBACK_FCT;
-    if (_tx.ackFctPtr == NULL) return KNX_TPUART_ERROR_NULL_ACK_CALLBACK_FCT;
+//    if (_evtCallbackFct == NULL) return KNX_TPUART_ERROR_NULL_EVT_CALLBACK_FCT;
+//    if (_tx.ackFctPtr == NULL) return KNX_TPUART_ERROR_NULL_ACK_CALLBACK_FCT;
 
     // Set Physical address. This allows to activate address evaluation by the TPUART
     tpuartCmd[0] = TPUART_SET_ADDR_REQ;
@@ -255,10 +257,10 @@ void KnxTpUart::RXTask(void)
 {
 byte incomingByte;
 word nowTime;
-static byte readBytesNb; // Nb of read bytes during an KNX telegram reception
-static KnxTelegram telegram; // telegram being received
-static byte addressedComObjectIndex; // index of the com object targeted by the received telegram
-static word lastByteRxTimeMicrosec;
+byte readBytesNb; // Nb of read bytes during an KNX telegram reception
+KnxTelegram telegram; // telegram being received
+byte addressedComObjectIndex; // index of the com object targeted by the received telegram
+word lastByteRxTimeMicrosec;
 
 // === STEP 1 : Check EOP in case a Telegram is being received ===
   if (_rx.state >= RX_KNX_TELEGRAM_RECEPTION_STARTED)
@@ -271,7 +273,8 @@ static word lastByteRxTimeMicrosec;
       {
         case RX_KNX_TELEGRAM_RECEPTION_STARTED : // we are not supposed to get EOP now, the telegram is incomplete
         case RX_KNX_TELEGRAM_RECEPTION_LENGTH_INVALID :
-          _evtCallbackFct(TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR); // Notify telegram reception error
+//          _evtCallbackFct(TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR); // Notify telegram reception error
+          _knxDevice->GetTpUartEvents(TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR);
           break;
 
         case RX_KNX_TELEGRAM_RECEPTION_ADDRESSED :
@@ -279,11 +282,13 @@ static word lastByteRxTimeMicrosec;
           { // checksum correct, let's update the _rx struct with the received telegram and correct index
         	telegram.Copy(_rx.receivedTelegram);
             _rx.addressedComObjectIndex  = addressedComObjectIndex;
-            _evtCallbackFct(TPUART_EVENT_RECEIVED_KNX_TELEGRAM); // Notify the new received telegram
+//            _evtCallbackFct(TPUART_EVENT_RECEIVED_KNX_TELEGRAM); // Notify the new received telegram
+            _knxDevice->GetTpUartEvents(TPUART_EVENT_RECEIVED_KNX_TELEGRAM);
           }
           else
           {  // checksum incorrect, notify error
-            _evtCallbackFct(TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR); // Notify telegram reception error
+//            _evtCallbackFct(TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR); // Notify telegram reception error
+              _knxDevice->GetTpUartEvents(TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR);
           }
           break;
 
@@ -317,7 +322,7 @@ static word lastByteRxTimeMicrosec;
           {
             if (_tx.state == TX_WAITING_ACK)
             {
-              _tx.ackFctPtr(ACK_RESPONSE);
+//TODO              _tx.ackFctPtr(ACK_RESPONSE);
               _tx.state = TX_IDLE;
             }
             else DebugError("Rx: unexpected TPUART_DATA_CONFIRM_SUCCESS received!\n");
@@ -328,17 +333,20 @@ static word lastByteRxTimeMicrosec;
         
             if ( (_tx.state == TX_TELEGRAM_SENDING_ONGOING ) || (_tx.state == TX_WAITING_ACK ) )
             { // response to the TP UART transmission
-              _tx.ackFctPtr(TPUART_RESET_RESPONSE);
+//TODO              _tx.ackFctPtr(TPUART_RESET_RESPONSE);
             }
            _tx.state = TX_STOPPED;
            _rx.state = RX_STOPPED;
-           _evtCallbackFct(TPUART_EVENT_RESET); // Notify RESET
+//           _evtCallbackFct(TPUART_EVENT_RESET); // Notify RESET
+           _knxDevice->GetTpUartEvents(TPUART_EVENT_RESET);
+           
            return;
           }
           // CASE OF STATE_INDICATION RESPONSE
           else if ((incomingByte & TPUART_STATE_INDICATION_MASK) == TPUART_STATE_INDICATION)
           {
-            _evtCallbackFct(TPUART_EVENT_STATE_INDICATION); // Notify STATE INDICATION
+//            _evtCallbackFct(TPUART_EVENT_STATE_INDICATION); // Notify STATE INDICATION
+              _knxDevice->GetTpUartEvents(TPUART_EVENT_STATE_INDICATION);
             _stateIndication = incomingByte;
             DebugInfo("Rx: State Indication Received\n");
           }
@@ -348,7 +356,7 @@ static word lastByteRxTimeMicrosec;
             // NACK following Telegram transmission
             if (_tx.state == TX_WAITING_ACK)
             {
-              _tx.ackFctPtr(NACK_RESPONSE);
+//TODO              _tx.ackFctPtr(NACK_RESPONSE);
               _tx.state = TX_IDLE; 
             }
             else DebugError("Rx: unexpected TPUART_DATA_CONFIRM_FAILED received!\n");
@@ -440,7 +448,7 @@ static word sentMessageTimeMillisec;
       // - The telegram emission might be delayed by another message transmission ongoing
       // - The telegram emission might be delayed by the simultaneous transmission of higher prio messages
       // Let's take around 3 times the max emission duration (160ms) as arbitrary value
-      _tx.ackFctPtr(NO_ANSWER_TIMEOUT); // Send a No Answer TIMEOUT
+//TODO      _tx.ackFctPtr(NO_ANSWER_TIMEOUT); // Send a No Answer TIMEOUT
       _tx.state = TX_IDLE;
     }
     break;

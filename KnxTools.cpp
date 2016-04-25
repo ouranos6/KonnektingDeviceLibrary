@@ -31,7 +31,7 @@
 
 /*
  * !!!!! IMPORTANT !!!!!
- * if "#define DEBUG" is set, you must run your KONNEKTING Suite with "-Dde.root1.slicknx.konnekting.debug=true" 
+ * if "#define DEBUG" is set, you must run your KONNEKTING Suite with "-Dde.root1.slic_knxDevice->konnekting.debug=true" 
  * A release-version of your development MUST NOT contain "#define DEBUG" ...
  */
 #define DEBUG
@@ -77,9 +77,6 @@ SoftwareSerial knxToolsDebugSerial(10, 11); // RX, TX
 #define MSGTYPE_READ_COM_OBJECT             41 // 0x29
 #define MSGTYPE_ANSWER_COM_OBJECT           42 // 0x2A
 
-// KnxTools unique instance creation
-KnxTools KnxTools::Tools;
-KnxTools& Tools = KnxTools::Tools;
 
 /**
  * Intercepting knx events to process internal com objects
@@ -100,7 +97,9 @@ void knxToolsEvents(byte index) {
 /**
  * Constructor
  */
-KnxTools::KnxTools() {
+KnxTools::KnxTools(KnxDevice* knxDevice) {
+    
+    _knxDevice = knxDevice;
 #ifdef DEBUG
     knxToolsDebugSerial.begin(9600);
 #endif    
@@ -166,10 +165,10 @@ void KnxTools::init(HardwareSerial& serial, int progButtonPin, int progLedPin, w
     CONSOLEDEBUGLN("hex");
 
     CONSOLEDEBUG("numberOfCommObjects: ");
-    CONSOLEDEBUGLN(Knx.getNumberOfComObjects());
+    CONSOLEDEBUGLN(_knxDevice->getNumberOfComObjects());
 
     // calc index of parameter table in eeprom --> depends on number of com objects
-    _paramTableStartindex = EEPROM_COMOBJECTTABLE_START + (Knx.getNumberOfComObjects() * 2);
+    _paramTableStartindex = EEPROM_COMOBJECTTABLE_START + (_knxDevice->getNumberOfComObjects() * 2);
 
     _deviceFlags = EEPROM.read(EEPROM_DEVICE_FLAGS);
     
@@ -191,11 +190,11 @@ void KnxTools::init(HardwareSerial& serial, int progButtonPin, int progLedPin, w
 
         // ComObjects
         // at most 255 com objects
-        for (byte i = 0; i < Knx.getNumberOfComObjects()*2; i+=2) {
+        for (byte i = 0; i < _knxDevice->getNumberOfComObjects()*2; i+=2) {
             byte hi = EEPROM.read(i + EEPROM_COMOBJECTTABLE_START);
             byte lo = EEPROM.read(i + EEPROM_COMOBJECTTABLE_START + 1);
             word comObjAddr = (hi << 8) + (lo << 0);
-            Knx.setComObjectAddress(i+1, comObjAddr);
+            _knxDevice->setComObjectAddress(i+1, comObjAddr);
             CONSOLEDEBUG("ComObj ID=");
             CONSOLEDEBUG(i);
             CONSOLEDEBUG(" index=");
@@ -214,7 +213,7 @@ void KnxTools::init(HardwareSerial& serial, int progButtonPin, int progLedPin, w
     }
     CONSOLEDEBUG("IA: 0x");
     CONSOLEDEBUGLN(_individualAddress, HEX);
-    Knx.begin(serial, _individualAddress);
+    _knxDevice->begin(serial, _individualAddress);
 }
 
 bool KnxTools::isActive() {
@@ -317,7 +316,7 @@ KnxComObject KnxTools::createProgComObject() {
  * Reboot device via WatchDogTimer within 1s
  */
 void KnxTools::reboot() {
-    Knx.end();
+    _knxDevice->end();
     
 #ifdef ESP8266 
     CONSOLEDEBUGLN("ESP8266 restart");
@@ -349,7 +348,7 @@ bool KnxTools::internalComObject(byte index) {
             
 //            CONSOLEDEBUGLN("About to read 14 bytes");
             byte buffer[14];
-            Knx.read(0, buffer);
+            _knxDevice->read(0, buffer);
 //            CONSOLEDEBUGLN("done reading 14 bytes");
 
             for (int i = 0; i < 14; i++) {
@@ -442,7 +441,7 @@ void KnxTools::sendAck(byte errorcode, byte indexinformation){
     for (byte i=5;i<14;i++){
         response[i] = 0x00;
     }
-    Knx.write(0, response);    
+    _knxDevice->write(0, response);    
 }
 
 
@@ -463,7 +462,7 @@ void KnxTools::handleMsgReadDeviceInfo(byte msg[]) {
     response[11] = 0x00;
     response[12] = 0x00;
     response[13] = 0x00;
-    Knx.write(0, response);
+    _knxDevice->write(0, response);
 }
 
 void KnxTools::handleMsgRestart(byte msg[]) {
@@ -522,7 +521,7 @@ void KnxTools::handleMsgReadProgrammingMode(byte msg[]) {
         response[11] = 0x00;
         response[12] = 0x00;
         response[13] = 0x00;
-        Knx.write(0, response);
+        _knxDevice->write(0, response);
     }
 }
 
@@ -564,7 +563,7 @@ void KnxTools::handleMsgReadIndividualAddress(byte msg[]) {
     response[11] = 0x00;
     response[12] = 0x00;
     response[13] = 0x00;
-    Knx.write(0, response);
+    _knxDevice->write(0, response);
 }
 
 void KnxTools::handleMsgWriteParameter(byte msg[]) {
@@ -622,7 +621,7 @@ void KnxTools::handleMsgReadParameter(byte msg[]) {
         response[3 + paramSize + i] = 0;
     }
 
-    Knx.write(0, response);
+    _knxDevice->write(0, response);
 
 }
 
@@ -653,7 +652,7 @@ void KnxTools::handleMsgWriteComObject(byte msg[]) {
         CONSOLEDEBUGLN("");
         
         
-        e_KnxDeviceStatus result = Knx.setComObjectAddress(comObjId, ga);
+        e_KnxDeviceStatus result = _knxDevice->setComObjectAddress(comObjId, ga);
         if (result != KNX_DEVICE_ERROR) {
             sendAck(result, comObjId);
         } else {
@@ -679,7 +678,7 @@ void KnxTools::handleMsgReadComObject(byte msg[]) {
     for (byte i=0; i<numberOfComObjects; i++) {
         
         byte comObjId = msg[3+i];
-        word ga = Knx.getComObjectAddress(comObjId);
+        word ga = _knxDevice->getComObjectAddress(comObjId);
         
         byte tupelOffset = 3 + ((i - 1)*3);
         response[tupelOffset+0] = comObjId;
@@ -693,7 +692,7 @@ void KnxTools::handleMsgReadComObject(byte msg[]) {
         response[3 + (numberOfComObjects*3) + i] = 0;
     }
 
-    Knx.write(0, response);
+    _knxDevice->write(0, response);
 
 }
 

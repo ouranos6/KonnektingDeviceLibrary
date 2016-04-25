@@ -51,19 +51,20 @@
 extern void knxToolsEvents(byte index);
 
 class KnxTools {
-    static byte _paramSizeList[];
-    static const byte _numberOfParams;                // Nb of attached Parameters
+    
+    // Reference to KnxDevice
+    KnxDevice* _knxDevice;  
+    
+    byte _paramSizeList[];
+    byte _numberOfParams;                // Nb of attached Parameters
 
     // Constructor, Destructor
-    KnxTools(); // private constructor (singleton design pattern)
-
-    ~KnxTools() {
-    } // private destructor (singleton design pattern)
-    KnxTools(const KnxTools&); // private copy constructor (singleton design pattern) 
+    
 
 public:
-    static KnxTools Tools;
-                                                    // The value shall be provided by the end-user
+    
+    KnxTools(KnxDevice* knxDevice); // private constructor (singleton design pattern)
+    ~KnxTools();
 
     void init(HardwareSerial& serial, int progButtonPin, int progLedPin, word manufacturerID, byte deviceID, byte revisionID);
 

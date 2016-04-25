@@ -32,41 +32,51 @@ static inline word TimeDeltaWord(word now, word before) {
     return (word) (now - before);
 }
 
-#ifdef KNXDEVICE_DEBUG_INFO
-const char KnxDevice::_debugInfoText[] = "KNXDEVICE INFO: ";
-#endif
-
-// KnxDevice unique instance creation
-KnxDevice KnxDevice::Knx;
-KnxDevice& Knx = KnxDevice::Knx;
-
-
 // Constructor
-
-KnxDevice::KnxDevice() {
+KnxDevice::KnxDevice(KnxComObject comObjectList[], byte* paramSizeList) {
+    
+    // get number of com objects from provided list
+    _numberOfComObjects = sizeof (_comObjectsList) / sizeof (KnxComObject);
+    
+    // increment by one, because we will have a prog-com-obj
+    _numberOfComObjects += 1;
+    
+    // dynamically allocate array with calculated size
+    _comObjectsList = (KnxComObject*) malloc((_numberOfComObjects) * sizeof(KnxComObject));
+    
+    /* predefined prog com object */
+    _comObjectsList[0] = KnxComObject(G_ADDR(15,7,255), KNX_DPT_60000_000 /* KNX PROGRAM */, KNX_COM_OBJ_C_W_U_T_INDICATOR); 
+          
     _state = INIT;
     _tpuart = NULL;
     _txActionList = ActionRingBuffer<type_tx_action, ACTIONS_QUEUE_SIZE>();
     _initCompleted = false;
     _initIndex = 0;
     _rxTelegram = NULL;
-#if defined(KNXDEVICE_DEBUG_INFO)
-    _nbOfInits = 0;
-    _debugStrPtr = NULL;
-#endif
+
 }
 
+/**
+ * Returns number of comobjects (includes prog com obj)
+ * @return _numberOfComObjects
+ */
 int KnxDevice::getNumberOfComObjects() {
     return _numberOfComObjects;
 }
 
 
-// Start the KNX Device
-// return KNX_DEVICE_ERROR (255) if begin() failed
-// else return KNX_DEVICE_OK
-
+/**
+ * Start the KNX Device
+ * return KNX_DEVICE_ERROR (255) if begin() failed
+ * else return KNX_DEVICE_OK
+ * @param serial serial device to which the KNX Transceiver is connected
+ * @param physicalAddr physical address (or individual address) of device, something like 1.0.100
+ * 
+ * @return e_KnxDeviceStatus
+ * 
+ */
 e_KnxDeviceStatus KnxDevice::begin(HardwareSerial& serial, word physicalAddr) {
-    _tpuart = new KnxTpUart(serial, physicalAddr, NORMAL);
+    _tpuart = new KnxTpUart(serial, this, physicalAddr, NORMAL);
     _rxTelegram = &_tpuart->GetReceivedTelegram();
     // delay(10000); // Workaround for init issue with bus-powered arduino
     // the issue is reproduced on one (faulty?) TPUART device only, so remove it for the moment.
@@ -77,17 +87,15 @@ e_KnxDeviceStatus KnxDevice::begin(HardwareSerial& serial, word physicalAddr) {
         DebugInfo("Init Error!\n");
         return KNX_DEVICE_ERROR;
     }
-    _tpuart->AttachComObjectsList(_comObjectsList, _numberOfComObjects);
-    _tpuart->SetEvtCallback(&KnxDevice::GetTpUartEvents);
-    _tpuart->SetAckCallback(&KnxDevice::TxTelegramAck);
+    _tpuart->AttachComObjectsList(_comObjectsList);
+//    _tpuart->SetEvtCallback(&KnxDevice::GetTpUartEvents);
+//    _tpuart->SetAckCallback(&KnxDevice::TxTelegramAck);
     _tpuart->Init();
     _state = IDLE;
     DebugInfo("Init successful\n");
     _lastInitTimeMillis = millis();
     _lastTXTimeMicros = _lastTXTimeMicros = micros();
-#if defined(KNXDEVICE_DEBUG_INFO)
-    _nbOfInits = 0;
-#endif
+
     return KNX_DEVICE_OK;
 }
 
@@ -125,9 +133,6 @@ void KnxDevice::task(void) {
                 //  DebugInfo(String("KNXDevice INFO: Com Object init completed, ")+ String( _nbOfInits) + String("objs initialized.\n"));
             } else { // Com Object to be initialised has been found
                 // Add a READ request in the TX action list
-#if defined(KNXDEVICE_DEBUG_INFO) || defined(KNXDEVICE_DEBUG_INFO_VERBOSE)
-                _nbOfInits++;
-#endif
                 action.command = KNX_READ_REQUEST;
                 action.index = _initIndex;
                 _txActionList.Append(action);
@@ -147,12 +152,9 @@ void KnxDevice::task(void) {
     // STEP 3 : Send KNX messages following TX actions
     if (_state == IDLE) {
         if (_txActionList.Pop(action)) { // Data to be transmitted
-//            Serial.println("Something to do");
             switch (action.command) {
                 
                 case KNX_READ_REQUEST: // a read operation of a Com Object on the KNX network is required
-//                    Serial.println("KNX_READ_REQUEST");
-                    //_objectsList[action.index].CopyToTelegram(_txTelegram, KNX_COMMAND_VALUE_READ);
                     _comObjectsList[action.index].CopyAttributes(_txTelegram);
                     _txTelegram.ClearLongPayload();
                     _txTelegram.ClearFirstPayloadByte(); // Is it required to have a clean payload ??
@@ -163,7 +165,7 @@ void KnxDevice::task(void) {
                     break;
 
                 case KNX_RESPONSE_REQUEST: // a response operation of a Com Object on the KNX network is required
-//                    Serial.println("KNX_RESPONSE_REQUEST");
+
                     _comObjectsList[action.index].CopyAttributes(_txTelegram);
                     _comObjectsList[action.index].CopyValue(_txTelegram);
                     _txTelegram.SetCommand(KNX_COMMAND_VALUE_RESPONSE);
@@ -174,24 +176,19 @@ void KnxDevice::task(void) {
 
                 case KNX_WRITE_REQUEST: // a write operation of a Com Object on the KNX network is required
                     // update the com obj value
-//                    Serial.println("KNX_WRITE_REQUEST");
                     if ((_comObjectsList[action.index].GetLength()) <= 2)
                         _comObjectsList[action.index].UpdateValue(action.byteValue);
                     else {
                         _comObjectsList[action.index].UpdateValue(action.valuePtr);
                         free(action.valuePtr);
-//                        Serial.println("KNX_WRITE_REQUEST2");
                     }
                     // transmit the value through KNX network only if the Com Object has transmit attribute
                     if ((_comObjectsList[action.index].GetIndicator()) & KNX_COM_OBJ_T_INDICATOR) {
-//                        Serial.println("KNX_WRITE_REQUEST3");
                         _comObjectsList[action.index].CopyAttributes(_txTelegram);
                         _comObjectsList[action.index].CopyValue(_txTelegram);
                         _txTelegram.SetCommand(KNX_COMMAND_VALUE_WRITE);
                         _txTelegram.UpdateChecksum();
-//                        Serial.println("KNX_WRITE_REQUEST4");
                         _tpuart->SendTelegram(_txTelegram);
-//                        Serial.println("KNX_WRITE_REQUEST5");
                         _state = TX_ONGOING;
                     }
                     break;
@@ -301,20 +298,14 @@ e_KnxDeviceStatus KnxDevice::write(byte objectIndex, byte valuePtr[]) {
     type_tx_action action;
     byte *dptValue;
     byte length = _comObjectsList[objectIndex].GetLength();
-//    Serial.println("Writing to actionlist0");
-//    Serial.print("len: ");
-//    Serial.println(length);
     if (length > 2) // check we are in long object case
     { // add WRITE action in the TX action queue
-//        Serial.println("Writing to actionlist1");
         action.command = KNX_WRITE_REQUEST;
         action.index = objectIndex;
         dptValue = (byte *) malloc(length - 1); // allocate the memory for long value
         for (byte i = 0; i < length - 1; i++) dptValue[i] = valuePtr[i]; // copy value
-//        Serial.println("Writing to actionlist2");
         action.valuePtr = (byte *) dptValue;
         _txActionList.Append(action);
-//        Serial.println("Writing to actionlist3");
         return KNX_DEVICE_OK;
     }
     return KNX_DEVICE_ERROR;
@@ -365,27 +356,27 @@ void KnxDevice::GetTpUartEvents(e_KnxTpUartEvent event) {
 
     // Manage RECEIVED MESSAGES
     if (event == TPUART_EVENT_RECEIVED_KNX_TELEGRAM) {
-        Knx._state = IDLE;
-        targetedComObjIndex = Knx._tpuart->GetTargetedComObjectIndex();
+        _state = IDLE;
+        targetedComObjIndex = _tpuart->GetTargetedComObjectIndex();
 
-        switch (Knx._rxTelegram->GetCommand()) {
+        switch (_rxTelegram->GetCommand()) {
             case KNX_COMMAND_VALUE_READ:
-                Knx.DebugInfo("READ req.\n");
+                DebugInfo("READ req.\n");
                 // READ command coming from the bus
                 // if the Com Object has read attribute, then add RESPONSE action in the TX action list
                 if ((_comObjectsList[targetedComObjIndex].GetIndicator()) & KNX_COM_OBJ_R_INDICATOR) { // The targeted Com Object can indeed be read
                     action.command = KNX_RESPONSE_REQUEST;
                     action.index = targetedComObjIndex;
-                    Knx._txActionList.Append(action);
+                    _txActionList.Append(action);
                 }
                 break;
 
             case KNX_COMMAND_VALUE_RESPONSE:
-                Knx.DebugInfo("RESP req.\n");
+                DebugInfo("RESP req.\n");
                 // RESPONSE command coming from KNX network, we update the value of the corresponding Com Object.
                 // We 1st check that the corresponding Com Object has UPDATE attribute
                 if ((_comObjectsList[targetedComObjIndex].GetIndicator()) & KNX_COM_OBJ_U_INDICATOR) {
-                    _comObjectsList[targetedComObjIndex].UpdateValue(*(Knx._rxTelegram));
+                    _comObjectsList[targetedComObjIndex].UpdateValue(*(_rxTelegram));
                     //We notify the upper layer of the update
                     knxEvents(targetedComObjIndex);
                 }
@@ -393,19 +384,19 @@ void KnxDevice::GetTpUartEvents(e_KnxTpUartEvent event) {
 
 
             case KNX_COMMAND_VALUE_WRITE:
-                Knx.DebugInfo("WRITE req.\n");
+                DebugInfo("WRITE req.\n");
                 // WRITE command coming from KNX network, we update the value of the corresponding Com Object.
                 // We 1st check that the corresponding Com Object has WRITE attribute
                 if ((_comObjectsList[targetedComObjIndex].GetIndicator()) & KNX_COM_OBJ_W_INDICATOR) {
-                    _comObjectsList[targetedComObjIndex].UpdateValue(*(Knx._rxTelegram));
+                    _comObjectsList[targetedComObjIndex].UpdateValue(*(_rxTelegram));
                     //We notify the upper layer of the update
-                    if (Tools.isActive()) {
+//                    if (Tools.isActive()) {
 //                        Serial.println("Routing event to tools");
-                        knxToolsEvents(targetedComObjIndex);
-                    } else {
+//                        knxToolsEvents(targetedComObjIndex);
+//                    } else {
 //                        Serial.println("No event routing");
                         knxEvents(targetedComObjIndex);
-                    }
+//                    }
                 }
                 break;
 
@@ -417,9 +408,9 @@ void KnxDevice::GetTpUartEvents(e_KnxTpUartEvent event) {
 
     // Manage RESET events
     if (event == TPUART_EVENT_RESET) {
-        while (Knx._tpuart->Reset() == KNX_TPUART_ERROR);
-        Knx._tpuart->Init();
-        Knx._state = IDLE;
+        while (_tpuart->Reset() == KNX_TPUART_ERROR);
+        _tpuart->Init();
+        _state = IDLE;
     }
 }
 
@@ -427,21 +418,7 @@ void KnxDevice::GetTpUartEvents(e_KnxTpUartEvent event) {
 // Static TxTelegramAck() function called by the KnxTpUart layer (callback)
 
 void KnxDevice::TxTelegramAck(e_TpUartTxAck value) {
-    Knx._state = IDLE;
-#ifdef KNXDevice_DEBUG
-    if (value != ACK_RESPONSE) {
-        switch (value) {
-            case NACK_RESPONSE: DebugInfo("NACK RESPONSE!!\n");
-                break;
-            case NO_ANSWER_TIMEOUT: DebugInfo("NO ANSWER TIMEOUT RESPONSE!!\n");
-                ;
-                break;
-            case TPUART_RESET_RESPONSE: DebugInfo("RESET RESPONSE!!\n");
-                ;
-                break;
-        }
-    }
-#endif // KNXDevice_DEBUG
+    _state = IDLE;
 }
 
 

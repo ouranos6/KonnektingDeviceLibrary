@@ -32,6 +32,7 @@
 #include "KnxTelegram.h"
 #include "KnxComObject.h"
 #include "ActionRingBuffer.h"
+class KnxTpUart;
 #include "KnxTpUart.h"
 #include "KnxTools.h"
 
@@ -58,6 +59,22 @@ inline word G_ADDR(byte maingrp, byte subgrp)
 { return (word) ( ((maingrp&0x1F)<<11) + subgrp ); }
 
 #define ACTIONS_QUEUE_SIZE 16
+
+// Definition of the TP-UART events sent to the application layer
+enum e_KnxTpUartEvent { 
+  TPUART_EVENT_RESET = 0,                    // reset received from the TPUART device
+  TPUART_EVENT_RECEIVED_KNX_TELEGRAM,        // a new addressed KNX Telegram has been received
+  TPUART_EVENT_KNX_TELEGRAM_RECEPTION_ERROR, // a new addressed KNX telegram reception failed
+  TPUART_EVENT_STATE_INDICATION              // new TPUART state indication received
+ };
+ 
+ // Acknowledge values following a telegram sending
+enum e_TpUartTxAck {
+   ACK_RESPONSE = 0,     // TPUART received an ACK following telegram sending
+   NACK_RESPONSE,        // TPUART received a NACK following telegram sending (1+3 attempts by default)
+   NO_ANSWER_TIMEOUT,    // No answer (Data_Confirm) received from the TPUART
+   TPUART_RESET_RESPONSE // TPUART RESET before we get any ACK
+};
 
 // KnxDevice internal state
 enum e_KnxDeviceState {
@@ -106,12 +123,10 @@ template <typename T> e_KnxDeviceStatus ConvertToDpt(T value, byte dpt[], byte d
 class KnxDevice {
         
     // List of Com Objects attached to the KNX Device
-    // The definition shall be provided by the end-user
-    static KnxComObject _comObjectsList[];          
+    KnxComObject* _comObjectsList;          
     
     // Nb of attached Com Objects
-    // The value shall be provided by the end-user
-    static const byte _numberOfComObjects;                
+    byte _numberOfComObjects;                
     
     // Current KnxDevice state
     e_KnxDeviceState _state;  
@@ -149,20 +164,12 @@ class KnxDevice {
     static const char _debugInfoText[];
 #endif
     
-    // Constructor, Destructor
-    // private constructor (singleton design pattern)
-    KnxDevice();  
-    // private destructor (singleton design pattern)
-    ~KnxDevice() {}  
-    // private copy constructor (singleton design pattern) 
-    KnxDevice (const KnxDevice&); 
-
-    
   public:
+    // Constructor, Destructor
+    KnxDevice(KnxComObject comObjectsList[], byte paramSizeList[]);  
+
+    ~KnxDevice() {}  
       
-    // unique KnxDevice instance (singleton design pattern)      
-    static KnxDevice Knx; 
-    
     int getNumberOfComObjects();
     
     /*
@@ -243,17 +250,20 @@ class KnxDevice {
 #if defined(KNXDEVICE_DEBUG_INFO)
     void SetDebugString(String *strPtr);
 #endif
-
+    
+    void GetTpUartEvents(e_KnxTpUartEvent event);
+    void TxTelegramAck(e_TpUartTxAck);
+    
   private:
     /*
      * Static GetTpUartEvents() function called by the KnxTpUart layer (callback)
      */
-    static void GetTpUartEvents(e_KnxTpUartEvent event);
+    //static void GetTpUartEvents(e_KnxTpUartEvent event);
 
     /* 
      * Static TxTelegramAck() function called by the KnxTpUart layer (callback)
      */
-    static void TxTelegramAck(e_TpUartTxAck);
+    //static void TxTelegramAck(e_TpUartTxAck);
 
     /* 
      * Inline Debug function (definition later in this file)
@@ -276,6 +286,6 @@ inline void KnxDevice::DebugInfo(const char comment[]) const
 }
 
 // Reference to the KnxDevice unique instance
-extern KnxDevice& Knx;
+//extern KnxDevice& Knx;
 
 #endif // KNXDEVICE_H

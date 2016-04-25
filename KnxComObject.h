@@ -69,13 +69,13 @@
 class KnxComObject {
     word _addr; // Group Address value
 
-    const byte _dptId; // Datapoint type
+    byte _dptId; // Datapoint type
 
-    const byte _indicator; // C/R/W/T/U/I indicators
+    byte _indicator; // C/R/W/T/U/I indicators
 
     // Com object data length is calculated in the same way as telegram payload length
     // (See "knx.org" telegram specification for more details)
-    const byte _length;
+    byte _length;
 
 #ifdef KNX_COM_OBJ_SUPPORT_ALL_PRIORITIES
     const e_KnxPriority _prio; // priority
