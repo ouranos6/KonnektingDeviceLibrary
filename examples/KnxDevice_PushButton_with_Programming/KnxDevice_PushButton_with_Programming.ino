@@ -28,15 +28,15 @@ SoftwareSerial debugSerial(10, 11); // RX, TX
 #define KNX_SERIAL Serial1 // Leonardo/Micro etc. use Serial1
 #endif
 
+// #############################################################################
 
-
-// Definition of the Communication Objects attached to the device
+// create com objects
 KnxComObject _comObjectsList[] = {
     /* Index 0 : */ KnxComObject(G_ADDR(0, 0, 1), KNX_DPT_1_001, COM_OBJ_LOGIC_IN),
     /* Index 1 : */ KnxComObject(G_ADDR(0, 0, 2), KNX_DPT_1_001, COM_OBJ_SENSOR),
 };
 
-// Definition of parameter size
+// create parameter size definition
 byte _paramSizeList[] = {
     /* Param Index 0 */ PARAM_UINT8,
     /* Param Index 1 */ PARAM_INT16,
@@ -90,7 +90,7 @@ void setup() {
             /* Prog LED Pin */ PROG_LED_PIN, 
             /* manufacturer */ 57005, 
             /* device */ 190, 
-            /* revision */175);
+            /* revision */ 175);
     
 #ifdef DEBUG
     DEBUG.print("param #0: ");
