@@ -33,10 +33,9 @@ SoftwareSerial debugSerial(10, 11); // RX, TX
 // Definition of the Communication Objects attached to the device
 KnxComObject _comObjectsList[] = {
     ///* needs to be there, as long as Tools is used */ Tools.createProgComObject(),
-    /* Index 1 : */ KnxComObject(G_ADDR(0, 0, 1), KNX_DPT_1_001, COM_OBJ_LOGIC_IN),
-    /* Index 2 : */ KnxComObject(G_ADDR(0, 0, 2), KNX_DPT_1_001, COM_OBJ_SENSOR),
+    /* Index 0 : */ KnxComObject(G_ADDR(0, 0, 1), KNX_DPT_1_001, COM_OBJ_LOGIC_IN),
+    /* Index 1 : */ KnxComObject(G_ADDR(0, 0, 2), KNX_DPT_1_001, COM_OBJ_SENSOR),
 };
-//const byte KnxDevice::_numberOfComObjects = sizeof (_comObjectsList) / sizeof (KnxComObject); // do no change this code
 
 // Definition of parameter size
 byte _paramSizeList[] = {
@@ -51,9 +50,11 @@ byte _paramSizeList[] = {
     /* Param Index 8 */ PARAM_UINT8,
     /* Param Index 9 */ PARAM_UINT8,
 };
-//const byte KnxTools::_numberOfParams = sizeof (_paramSizeList); // do no change this code
 
+// Create KNX Instance
 KnxDevice knx(_comObjectsList, _paramSizeList);
+
+// Create Tools Instance
 //KnxTools tools(&knx);
 
 bool state = false;
