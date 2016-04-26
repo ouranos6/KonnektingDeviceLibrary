@@ -1,17 +1,9 @@
 // include KonnektingDevice library
 #include <KonnektingDevice.h>
 
-// #############################################################################
-// ### DEBUG SETTINGS
-
-// comment following line to disable DEBUG mode
-#define DEBUG debugSerial
-
-// no need to comment, you can leave it as it is as long you do not change the "#define DEBUG debugSerial" line
-#ifdef DEBUG
+// for debugging via softserial, not required when using any HardwareSerial
 #include <SoftwareSerial.h>
-SoftwareSerial debugSerial(10, 11); // RX, TX
-#endif
+
 
 // #############################################################################
 // ### KONNEKTING DEVICE SETTINGS
@@ -76,15 +68,15 @@ void knxEvents(byte index) {
 };
 
 void setup() {
-
-// if debug mode is enabled, setup serial port with 9600 baud    
-#ifdef DEBUG
-    DEBUG.begin(9600);
-#endif
        
     // set well defined state for LED pin for this special sample. Can be skipped in other sketches.
     pinMode(PROG_LED_PIN, OUTPUT);
     digitalWrite(PROG_LED_PIN, LOW);
+    
+    // remove if not using debugging capabilities
+    SoftwareSerial debugSerial(11, 10); // RX, TX
+    debugSerial.begin(9600);
+    //konnekting.setDebugSerial(debugSerial);
     
     // Initialize KNX enabled Arduino Board
     konnekting.init(/* KNX transceiver serial port */ KNX_SERIAL, 
@@ -96,22 +88,18 @@ void setup() {
             /* device */ DEVICE_ID, 
             /* revision */ REVISION);
     
-#ifdef DEBUG
-    DEBUG.print("param #0: ");
-    DEBUG.print(konnekting.getProg()->getUINT8Param(0));
-    konnekting.getProg()->getUINT8Param(0);
-    DEBUG.println("");
+    debugSerial.print("param #0: ");
+    debugSerial.print(konnekting.getProg()->getUINT8Param(0));
+    debugSerial.println("");
     
-    DEBUG.print("param #1: ");
-    DEBUG.print(konnekting.getProg()->getINT16Param(1));
-    DEBUG.println("");
+    debugSerial.print("param #1: ");
+    debugSerial.print(konnekting.getProg()->getINT16Param(1));
+    debugSerial.println("");
     
-    DEBUG.print("param #2: ");
-    DEBUG.print(konnekting.getProg()->getUINT32Param(2));
-    DEBUG.println("");
-#endif    
+    debugSerial.print("param #2: ");
+    debugSerial.print(konnekting.getProg()->getUINT32Param(2));
+    debugSerial.println("");
 
-    // setup GPIOs here!
 }
 
 void loop() {

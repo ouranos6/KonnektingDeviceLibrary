@@ -40,7 +40,8 @@ KonnektingDevice::KonnektingDevice() {
     _initCompleted = false;
     _initIndex = 0;
     _rxTelegram = NULL;
-//    _prog = KonnektingProg(this);
+    
+    _prog = new KonnektingProg(this);
 
 }
 

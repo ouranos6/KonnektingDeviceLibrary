@@ -125,6 +125,10 @@ template <typename T> e_KonnektingDeviceStatus ConvertFromDpt(const byte dpt[], 
 template <typename T> e_KonnektingDeviceStatus ConvertToDpt(T value, byte dpt[], byte dptFormat);
 
 class KonnektingDevice {
+    
+    
+    KonnektingProg *_prog;
+    
     // List of Com Objects attached to the KNX Device
     KnxComObject* _comObjectsList;
 
@@ -252,7 +256,7 @@ public:
 
 private:
     
-    KonnektingProg* _prog;
+    
     bool _initialized = false;
 
     word _individualAddress;
