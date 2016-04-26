@@ -26,21 +26,35 @@
 
 #include "KonnektingDevice.h"
 
+// enable debug code
+#define DEBUG
+
+#ifdef DEBUG
+#define CONSOLEDEBUG(...)  if (hasDebugSerial()) {getDebugSerial()->print(__VA_ARGS__);}
+#define CONSOLEDEBUGLN(...)  if (hasDebugSerial()) {getDebugSerial()->println(__VA_ARGS__);}
+#else
+#define CONSOLEDEBUG(...) 
+#define CONSOLEDEBUGLN(...)
+#endif
+
+
 static inline word TimeDeltaWord(word now, word before) {
     return (word) (now - before);
 }
 
 // Constructor
+
 KonnektingDevice::KonnektingDevice() {
-    
-              
+
+
     _state = INIT;
     _tpuart = NULL;
     _txActionList = ActionRingBuffer<type_tx_action, ACTIONS_QUEUE_SIZE>();
     _initCompleted = false;
     _initIndex = 0;
     _rxTelegram = NULL;
-    
+    _debugSerial = NULL;
+
     _prog = new KonnektingProg(this);
 
 }
@@ -58,9 +72,10 @@ KonnektingDevice::KonnektingDevice() {
  * @param revisionID
  * 
  */
-void KonnektingDevice::init(HardwareSerial& serial, KnxComObject comObjectList[], byte* paramSizeList, 
+void KonnektingDevice::init(HardwareSerial& serial, KnxComObject comObjectList[], byte* paramSizeList,
         int progButtonPin, int progLedPin, word manufacturerID, byte deviceID, byte revisionID) {
 
+    CONSOLEDEBUGLN(F("KD::init"));
     _prog->init(progButtonPin, progLedPin, manufacturerID, deviceID, revisionID);
     begin(serial, _prog->getIndividualAddress());
 }
@@ -72,7 +87,6 @@ void KonnektingDevice::init(HardwareSerial& serial, KnxComObject comObjectList[]
 int KonnektingDevice::getNumberOfComObjects() {
     return _numberOfComObjects;
 }
-
 
 /**
  * Start the KNX Device
@@ -93,12 +107,12 @@ e_KonnektingDeviceStatus KonnektingDevice::begin(HardwareSerial& serial, word ph
         delete(_tpuart);
         _tpuart = NULL;
         _rxTelegram = NULL;
-//        //DebugInfo("Init Error!\n");
+        //        //DebugInfo("Init Error!\n");
         return KNX_DEVICE_ERROR;
     }
     _tpuart->AttachComObjectsList(_comObjectsList);
-//    _tpuart->SetEvtCallback(&KonnektingDevice::GetTpUartEvents);
-//    _tpuart->SetAckCallback(&KonnektingDevice::TxTelegramAck);
+    //    _tpuart->SetEvtCallback(&KonnektingDevice::GetTpUartEvents);
+    //    _tpuart->SetAckCallback(&KonnektingDevice::TxTelegramAck);
     _tpuart->Init();
     _state = IDLE;
     //DebugInfo("Init successful\n");
@@ -110,6 +124,7 @@ e_KonnektingDeviceStatus KonnektingDevice::begin(HardwareSerial& serial, word ph
 
 
 // Stop the KNX Device
+
 void KonnektingDevice::end() {
     type_tx_action action;
 
@@ -125,11 +140,12 @@ void KonnektingDevice::end() {
 
 // KNX device execution task
 // This function call shall be placed in the "loop()" Arduino function
+
 void KonnektingDevice::task(void) {
-    
+
     type_tx_action action;
     word nowTimeMillis, nowTimeMicros;
-    
+
     // STEP 1 : Initialize Com Objects having Init Read attribute
     if (!_initCompleted) {
         nowTimeMillis = millis();
@@ -162,7 +178,7 @@ void KonnektingDevice::task(void) {
     if (_state == IDLE) {
         if (_txActionList.Pop(action)) { // Data to be transmitted
             switch (action.command) {
-                
+
                 case KNX_READ_REQUEST: // a read operation of a Com Object on the KNX network is required
                     _comObjectsList[action.index].CopyAttributes(_txTelegram);
                     _txTelegram.ClearLongPayload();
@@ -345,6 +361,7 @@ boolean KonnektingDevice::isActive(void) const {
 // Overwrite the address of an attache Com Object
 // Overwriting is allowed only when the KonnektingDevice is in INIT state
 // Typically usage is end-user application stored Group Address in EEPROM
+
 e_KonnektingDeviceStatus KonnektingDevice::setComObjectAddress(byte index, word addr) {
     if (_state != INIT) return KNX_DEVICE_ERROR;
     if (index >= _numberOfComObjects) return KNX_DEVICE_INVALID_INDEX;
@@ -399,13 +416,11 @@ void KonnektingDevice::GetTpUartEvents(e_KnxTpUartEvent event) {
                 if ((_comObjectsList[targetedComObjIndex].GetIndicator()) & KNX_COM_OBJ_W_INDICATOR) {
                     _comObjectsList[targetedComObjIndex].UpdateValue(*(_rxTelegram));
                     //We notify the upper layer of the update
-//                    if (Tools.isActive()) {
-//                        Serial.println("Routing event to tools");
-//                        knxToolsEvents(targetedComObjIndex);
-//                    } else {
-//                        Serial.println("No event routing");
+
+                    // if it's not a internal com object, route back to knxEvents()
+                    if (!_prog->internalComObject(targetedComObjIndex)) {
                         knxEvents(targetedComObjIndex);
-//                    }
+                    }
                 }
                 break;
 
@@ -556,8 +571,21 @@ template e_KonnektingDeviceStatus ConvertToDpt <double>(double, byte dptDestValu
 
 
 // --------------------------------------------
+
 KonnektingProg* KonnektingDevice::getProg() {
     return _prog;
+}
+
+void KonnektingDevice::setDebugSerial(Print* debugSerial){
+    _debugSerial = debugSerial;
+}
+
+boolean KonnektingDevice::hasDebugSerial() {
+    return _debugSerial != NULL;
+}
+
+Print* KonnektingDevice::getDebugSerial(){
+    return _debugSerial;
 }
 
 // EOF

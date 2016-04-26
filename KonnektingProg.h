@@ -77,9 +77,6 @@ class KonnektingDevice;
 #define PARAM_UINT32 4
 
 
-// process intercepted knxEvents-calls with this method
-extern void konnektingProgEvents(byte index);
-
 class KonnektingProg {
 public:
 
@@ -120,8 +117,7 @@ public:
      * @return true, if tools are initialized and active, false if not
      */
     bool isActive();
-    //
-    //
+
 private:
 
     // Reference to KnxDevice

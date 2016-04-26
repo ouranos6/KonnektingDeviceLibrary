@@ -129,6 +129,7 @@ class KonnektingDevice {
     
     KonnektingProg *_prog;
     
+    
     // List of Com Objects attached to the KNX Device
     KnxComObject* _comObjectsList;
 
@@ -174,7 +175,11 @@ public:
     }
 
     int getNumberOfComObjects();
-
+    
+    void setDebugSerial(Print* debugSerial);
+    Print* getDebugSerial();
+    bool hasDebugSerial();
+            
     /*
      * Start the KNX Device
      * return KNX_DEVICE_ERROR (255) if begin() failed
@@ -256,7 +261,7 @@ public:
 
 private:
     
-    
+    Print* _debugSerial;
     bool _initialized = false;
 
     word _individualAddress;

@@ -76,7 +76,7 @@ void setup() {
     // remove if not using debugging capabilities
     SoftwareSerial debugSerial(11, 10); // RX, TX
     debugSerial.begin(9600);
-    //konnekting.setDebugSerial(debugSerial);
+    konnekting.setDebugSerial(&debugSerial);
     
     // Initialize KNX enabled Arduino Board
     konnekting.init(/* KNX transceiver serial port */ KNX_SERIAL, 
